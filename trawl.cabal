@@ -21,6 +21,7 @@ executable trawl
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8
                      , Cabal
+                     , directory
                      , filepath
                      , process
                      , optparse-applicative ==0.11.*

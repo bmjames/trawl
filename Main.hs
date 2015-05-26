@@ -2,13 +2,14 @@ module Main where
 
 import Process
 
-import Data.Maybe (listToMaybe)
-import Data.List (intersperse)
+import Data.List (intercalate)
 import Data.List.Split (splitOn)
 import Distribution.InstalledPackageInfo
 import Options.Applicative
+import System.Directory (doesFileExist)
 import System.Exit
 import System.FilePath ((</>), addExtension)
+import System.IO (hPutStrLn, stderr)
 
 data TrawlOpts = FindPackage String | FindModule String
 
@@ -28,31 +29,47 @@ main = execParser opts >>= trawl where
 
 trawl :: TrawlOpts -> IO ()
 trawl (FindPackage pkg) = do
-  Just haddockIndex <- packageHaddockIndex pkg
-  putStrLn haddockIndex
+  haddockIndex <- packageHaddockIndex pkg
+  printExistingFileOrDie haddockIndex
 trawl (FindModule mod) = do
-  Just haddockFile <- moduleHaddock mod
-  putStrLn haddockFile
+  haddockFile <- moduleHaddock mod
+  printExistingFileOrDie haddockFile
 
-packageHaddockIndex :: String -> IO (Maybe FilePath)
-packageHaddockIndex pkg = (fmap . fmap) (</> "index.html") $ packageHaddock pkg
+packageHaddockIndex :: String -> IO FilePath
+packageHaddockIndex pkg = (</> "index.html") <$> packageHaddock pkg
 
-packageHaddock :: String -> IO (Maybe FilePath)
+packageHaddock :: String -> IO FilePath
 packageHaddock pkg = do
-  ProcessResult ExitSuccess out _ <- ghcPkg ["describe", pkg]
+  out <- ghcPkg ["describe", pkg]
+  let errMsg = "Output of `ghc-pkg describe " ++ pkg ++ "` contained no haddock paths"
   case parseInstalledPackageInfo out of
     ParseFailed err -> die $ "Failed to parse package info: " ++ show err
-    ParseOk _ info  -> return $ listToMaybe (haddockHTMLs info)
+    ParseOk _ info  -> case haddockHTMLs info of
+                         path:_ -> return path
+                         _      -> die errMsg
 
-moduleHaddock :: String -> IO (Maybe FilePath)
+moduleHaddock :: String -> IO FilePath
 moduleHaddock mod = do
-  ProcessResult ExitSuccess out _ <- ghcPkg ["find-module", mod]
+  out <- ghcPkg ["find-module", mod]
+  let errMsg = "Output of `ghc-pkg find-module " ++ mod ++ "` contained no packages"
   haddockRoot <- case words out of pkg:_ -> packageHaddock pkg
-  let moduleFile = concat (intersperse "-" $ splitOn "." mod) `addExtension` "html"
-  return $ (</> moduleFile) <$> haddockRoot
+                                   _     -> die errMsg
+  let moduleFile = intercalate "-" (splitOn "." mod) `addExtension` "html"
+  return $ haddockRoot </> moduleFile
 
-ghcPkg :: [String] -> IO ProcessResult
-ghcPkg args = processResult "." "ghc-pkg" $ ["-v0", "--global", "--simple-output"] ++ args
+ghcPkg :: [String] -> IO String
+ghcPkg args = do
+  ProcessResult exitCode out err <- processResult "." "ghc-pkg" $ ["-v0", "--global", "--simple-output"] ++ args
+  case exitCode of
+    ExitSuccess   -> return out
+    ExitFailure c -> die $ "ghc-pkg exited with code " ++ show c
 
 die :: String -> IO a
-die msg = putStrLn msg >> exitFailure
+die msg = hPutStrLn stderr msg >> exitFailure
+
+printExistingFileOrDie :: FilePath -> IO ()
+printExistingFileOrDie file = do
+  exists <- doesFileExist file
+  if exists
+     then putStrLn file
+     else die $ "File does not exist: " ++ file
