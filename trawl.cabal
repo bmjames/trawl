@@ -20,6 +20,7 @@ executable trawl
   other-modules:       Process
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8
+                     , Cabal
                      , process
                      , optparse-applicative ==0.11.*
   -- hs-source-dirs:      

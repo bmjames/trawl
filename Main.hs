@@ -2,7 +2,8 @@ module Main where
 
 import Process
 
-import Data.List
+import Data.Maybe (listToMaybe)
+import Distribution.InstalledPackageInfo
 import Options.Applicative
 import System.Exit
 
@@ -34,7 +35,9 @@ trawl (FindModule mod) = do
 findPackageHaddock :: String -> IO (Maybe FilePath)
 findPackageHaddock pkg = do
   ProcessResult ExitSuccess out _ <- ghcPkg ["describe", pkg]
-  return $ drop 14 <$> find ("haddock-html:" `isPrefixOf`) (lines out)
+  return $ case parseInstalledPackageInfo out of
+    ParseFailed err -> error $ "Failed to parse package info: " ++ show err
+    ParseOk _ info  -> listToMaybe $ haddockHTMLs info
 
 ghcPkg :: [String] -> IO ProcessResult
 ghcPkg args = processResult "." "ghc-pkg" $ ["-v0", "--global", "--simple-output"] ++ args
