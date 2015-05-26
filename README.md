@@ -10,5 +10,4 @@
     Available options:
       -h,--help                Show this help text
       -p,--package PACKAGE     Find the haddock index for PACKAGE
-      -m,--module MODULE       Find the haddock index for the package containing
-                               MODULE
+      -m,--module MODULE       Find the haddock page for MODULE
