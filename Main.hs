@@ -1,12 +1,16 @@
+
 module Main where
 
 import Process
 
+import Prelude hiding (foldr)
+import Data.Foldable (foldr)
 import Data.List (intercalate)
 import Data.List.Split (splitOn)
+import Data.String.Utils (replace)
 import Distribution.InstalledPackageInfo
 import Options.Applicative
-import System.Directory (doesFileExist)
+import System.Directory (canonicalizePath, doesFileExist)
 import System.Exit hiding (die)
 import System.FilePath ((</>), addExtension)
 import System.IO (hPutStrLn, stderr)
@@ -45,8 +49,10 @@ packageHaddock pkg = do
   case parseInstalledPackageInfo out of
     ParseFailed err -> die $ "Failed to parse package info: " ++ show err
     ParseOk _ info  -> case haddockHTMLs info of
-                         path:_ -> return path
+                         path:_ -> canonicalHaddockPath (pkgRoot info) path
                          _      -> die errMsg
+
+  where canonicalHaddockPath rootPath y = canonicalizePath $ foldr (replace "$topdir") y rootPath
 
 moduleHaddock :: String -> IO FilePath
 moduleHaddock mod = do

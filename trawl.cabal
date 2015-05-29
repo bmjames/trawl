@@ -20,9 +20,10 @@ executable trawl
   other-modules:       Process
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.9
-                     , Cabal
+                     , Cabal >=1.22
                      , directory
                      , filepath
+                     , MissingH
                      , process
                      , optparse-applicative ==0.11.*
                      , split
