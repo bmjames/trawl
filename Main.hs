@@ -7,7 +7,7 @@ import Data.List.Split (splitOn)
 import Distribution.InstalledPackageInfo
 import Options.Applicative
 import System.Directory (doesFileExist)
-import System.Exit
+import System.Exit hiding (die)
 import System.FilePath ((</>), addExtension)
 import System.IO (hPutStrLn, stderr)
 
