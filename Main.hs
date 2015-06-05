@@ -68,7 +68,9 @@ ghcPkg args = do
   ProcessResult exitCode out err <- processResult "." "ghc-pkg" $ ["-v0", "--global", "--simple-output"] ++ args
   case exitCode of
     ExitSuccess   -> return out
-    ExitFailure c -> die $ "ghc-pkg exited with code " ++ show c
+    ExitFailure c -> do
+      hPutStrLn stderr err
+      die $ "ghc-pkg exited with code " ++ show c
 
 die :: String -> IO a
 die msg = hPutStrLn stderr msg >> exitFailure
