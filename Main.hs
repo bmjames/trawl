@@ -65,7 +65,7 @@ moduleHaddock mod = do
 
 ghcPkg :: [String] -> IO String
 ghcPkg args = do
-  ProcessResult exitCode out err <- processResult "." "ghc-pkg" $ ["-v0", "--global", "--simple-output"] ++ args
+  ProcessResult exitCode out err <- processResult "." "ghc-pkg" $ ["-v0", "--simple-output"] ++ args
   case exitCode of
     ExitSuccess   -> return out
     ExitFailure c -> do
