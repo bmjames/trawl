@@ -1,4 +1,3 @@
-
 module Main where
 
 import Process
@@ -28,16 +27,13 @@ trawlOpts = FindPackage <$> strOption ( long "package"
                                      <> help "Find the haddock page for MODULE" )
 
 main :: IO ()
-main = execParser opts >>= trawl where
-  opts = info (helper <*> trawlOpts) fullDesc
+main = execParser opts >>= trawl >>= printExistingFileOrDie
+  where
+    opts = info (helper <*> trawlOpts) fullDesc
 
-trawl :: TrawlOpts -> IO ()
-trawl (FindPackage pkg) = do
-  haddockIndex <- packageHaddockIndex pkg
-  printExistingFileOrDie haddockIndex
-trawl (FindModule mod) = do
-  haddockFile <- moduleHaddock mod
-  printExistingFileOrDie haddockFile
+trawl :: TrawlOpts -> IO FilePath
+trawl (FindPackage pkg) = packageHaddockIndex pkg
+trawl (FindModule mod) =  moduleHaddock mod
 
 packageHaddockIndex :: String -> IO FilePath
 packageHaddockIndex pkg = (</> "index.html") <$> packageHaddock pkg
@@ -49,10 +45,10 @@ packageHaddock pkg = do
   case parseInstalledPackageInfo out of
     ParseFailed err -> die $ "Failed to parse package info: " ++ show err
     ParseOk _ info  -> case haddockHTMLs info of
-                         path:_ -> canonicalHaddockPath (pkgRoot info) path
+                         path:_ -> return $ realHaddockPath (pkgRoot info) path
                          _      -> die errMsg
 
-  where canonicalHaddockPath rootPath y = canonicalizePath $ foldr (replace "$topdir") y rootPath
+  where realHaddockPath rootPath root = foldr (replace "$topdir") root rootPath
 
 moduleHaddock :: String -> IO FilePath
 moduleHaddock mod = do
@@ -79,5 +75,5 @@ printExistingFileOrDie :: FilePath -> IO ()
 printExistingFileOrDie file = do
   exists <- doesFileExist file
   if exists
-     then putStrLn file
+     then canonicalizePath file >>= putStrLn
      else die $ "File does not exist: " ++ file
