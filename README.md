@@ -18,4 +18,10 @@ Given the name of a package or module, `trawl` simply prints the location of the
 
 `trawl` has no explicit support for Cabal sandboxes. To find haddocks in a sandbox, run using `cabal exec`, for example:
 
-    $ cabal exec trawl -- -m Data.List
+    $ cabal exec trawl -- -m Control.Concurrent.Async
+
+### Troubleshooting
+
+If `trawl` fails with the message `File does not exist: ...`, you may need to reinstall the package with the `--enable-documentation` flag:
+
+    $ cabal install --reinstall --enable-documentation async
