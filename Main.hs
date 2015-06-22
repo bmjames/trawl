@@ -60,7 +60,7 @@ moduleHaddock :: ModuleName -> IO (PackageName, FilePath)
 moduleHaddock (ModuleName mod) = do
   out <- ghcPkg ["find-module", mod]
   let errMsg = "Output of `ghc-pkg find-module " ++ mod ++ "` contained no packages"
-  case words out of
+  case reverse (words out) of
     h:_ -> do
       let moduleFile = intercalate "-" (splitOn "." mod) `addExtension` "html"
           pkg = PackageName h
