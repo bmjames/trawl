@@ -14,32 +14,38 @@ import System.Exit hiding (die)
 import System.FilePath ((</>), addExtension)
 import System.IO (hPutStrLn, stderr)
 
-data TrawlOpts = FindPackage String | FindModule String
+newtype PackageName = PackageName String
+newtype ModuleName = ModuleName String
+
+data TrawlOpts = FindPackage PackageName | FindModule ModuleName
 
 trawlOpts :: Parser TrawlOpts
-trawlOpts = FindPackage <$> strOption ( long "package"
-                                       <> short 'p'
-                                       <> metavar "PACKAGE"
-                                       <> help "Find the haddock index for PACKAGE" )
-        <|> FindModule  <$> strOption ( long "module"
-                                     <> short 'm'
-                                     <> metavar "MODULE"
-                                     <> help "Find the haddock page for MODULE" )
+trawlOpts =
+  FindPackage . PackageName <$>
+    strOption (long "package" <>
+               short 'p' <>
+               metavar "PACKAGE" <>
+               help "Find the haddock index for PACKAGE") <|>
+  FindModule . ModuleName <$>
+    strOption (long "module" <>
+               short 'm' <>
+               metavar "MODULE" <>
+               help "Find the haddock page for MODULE")
 
 main :: IO ()
-main = execParser opts >>= trawl >>= printExistingFileOrDie
+main = execParser opts >>= trawl >>= uncurry printExistingFileOrDie
   where
     opts = info (helper <*> trawlOpts) fullDesc
 
-trawl :: TrawlOpts -> IO FilePath
-trawl (FindPackage pkg) = packageHaddockIndex pkg
-trawl (FindModule mod) =  moduleHaddock mod
+trawl :: TrawlOpts -> IO (PackageName, FilePath)
+trawl (FindPackage pkg) = (,) pkg <$> packageHaddockIndex pkg
+trawl (FindModule mod) = moduleHaddock mod
 
-packageHaddockIndex :: String -> IO FilePath
+packageHaddockIndex :: PackageName -> IO FilePath
 packageHaddockIndex pkg = (</> "index.html") <$> packageHaddock pkg
 
-packageHaddock :: String -> IO FilePath
-packageHaddock pkg = do
+packageHaddock :: PackageName -> IO FilePath
+packageHaddock (PackageName pkg) = do
   out <- ghcPkg ["describe", pkg]
   let errMsg = "Output of `ghc-pkg describe " ++ pkg ++ "` contained no haddock paths"
   case parseInstalledPackageInfo out of
@@ -50,14 +56,17 @@ packageHaddock pkg = do
 
   where realHaddockPath rootPath root = foldr (replace "$topdir") root rootPath
 
-moduleHaddock :: String -> IO FilePath
-moduleHaddock mod = do
+moduleHaddock :: ModuleName -> IO (PackageName, FilePath)
+moduleHaddock (ModuleName mod) = do
   out <- ghcPkg ["find-module", mod]
   let errMsg = "Output of `ghc-pkg find-module " ++ mod ++ "` contained no packages"
-  haddockRoot <- case words out of pkg:_ -> packageHaddock pkg
-                                   _     -> die errMsg
-  let moduleFile = intercalate "-" (splitOn "." mod) `addExtension` "html"
-  return $ haddockRoot </> moduleFile
+  case words out of
+    h:_ -> do
+      let moduleFile = intercalate "-" (splitOn "." mod) `addExtension` "html"
+          pkg = PackageName h
+      haddockRoot <- packageHaddock pkg
+      return (pkg, haddockRoot </> moduleFile)
+    _ -> die errMsg
 
 ghcPkg :: [String] -> IO String
 ghcPkg args = do
@@ -71,9 +80,15 @@ ghcPkg args = do
 die :: String -> IO a
 die msg = hPutStrLn stderr msg >> exitFailure
 
-printExistingFileOrDie :: FilePath -> IO ()
-printExistingFileOrDie file = do
+printExistingFileOrDie :: PackageName -> FilePath -> IO ()
+printExistingFileOrDie (PackageName pkg) file = do
   exists <- doesFileExist file
   if exists
      then canonicalizePath file >>= putStrLn
-     else die $ "File does not exist: " ++ file
+     else do
+       hPutStrLn stderr $ "File does not exist: " ++ file
+       die suggestion
+
+  where
+    suggestion = "(Try reinstalling the package " ++ pkg ++
+                 " with the --enable-documentation flag)"
