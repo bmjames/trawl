@@ -6,7 +6,7 @@ Given the name of a package or module, `trawl` simply prints the location of the
 
 ## Installation
 
-    cabal install trawl
+    $ cabal install trawl
 
 ## Usage
 
@@ -17,6 +17,10 @@ Given the name of a package or module, `trawl` simply prints the location of the
       -h,--help                Show this help text
       -p,--package PACKAGE     Find the haddock index for PACKAGE
       -m,--module MODULE       Find the haddock page for MODULE
+
+`trawl` is intended to be used in conjunction with your favourite program for viewing HTML documents. For example,
+
+    $ chromium-browser $(trawl -p async)
 
 ### A note about Cabal sandboxes
 
