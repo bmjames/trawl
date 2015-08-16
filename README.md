@@ -4,6 +4,10 @@
 
 Given the name of a package or module, `trawl` simply prints the location of the corresponding Haddock HTML on your filesystem.
 
+## Installation
+
+    cabal install trawl
+
 ## Usage
 
     $ trawl --help
