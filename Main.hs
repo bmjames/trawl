@@ -6,13 +6,13 @@ import Prelude hiding (foldr)
 import Data.Foldable (foldr)
 import Data.List (intercalate)
 import Data.List.Split (splitOn)
-import Data.String.Utils (replace)
 import Distribution.InstalledPackageInfo
 import Options.Applicative
 import System.Directory (canonicalizePath, doesFileExist)
 import System.Exit hiding (die)
 import System.FilePath ((</>), addExtension)
 import System.IO (hPutStrLn, stderr)
+import Text.Regex (mkRegex, subRegex)
 
 newtype PackageName = PackageName String
 newtype ModuleName = ModuleName String
@@ -54,7 +54,7 @@ packageHaddock (PackageName pkg) = do
                          path:_ -> return $ realHaddockPath (pkgRoot info) path
                          _      -> die errMsg
 
-  where realHaddockPath rootPath root = foldr (replace "$topdir") root rootPath
+  where realHaddockPath = flip $ foldl (subRegex (mkRegex "\\$topdir"))
 
 moduleHaddock :: ModuleName -> IO (PackageName, FilePath)
 moduleHaddock (ModuleName mod) = do

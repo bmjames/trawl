@@ -30,9 +30,9 @@ executable trawl
                      , Cabal >=1.22
                      , directory
                      , filepath
-                     , MissingH
                      , process
-                     , optparse-applicative ==0.11.*
+                     , optparse-applicative ==0.12.*
+                     , regex-compat
                      , split
   -- hs-source-dirs:      
   default-language:    Haskell2010
