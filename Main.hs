@@ -90,5 +90,5 @@ printExistingFileOrDie (PackageName pkg) file = do
        die suggestion
 
   where
-    suggestion = "(Try reinstalling the package " ++ pkg ++
-                 " with the --enable-documentation flag)"
+    suggestion = "Try reinstalling the package " ++ pkg ++
+        " with --enable-documentation (cabal) or --haddock (stack)"
