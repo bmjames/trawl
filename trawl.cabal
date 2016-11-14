@@ -2,7 +2,7 @@
 --  see http://haskell.org/cabal/users-guide/
 
 name:                trawl
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis:            A tool for finding haddocks
 description:
   trawl is a human-friendly wrapper around ghc-pkg, for locating local documentation for Haskell packages and modules.
@@ -10,7 +10,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Ben James
 maintainer:          bmjames@gmail.com
-copyright:           Copyright 2015 Ben James
+copyright:           Copyright 2015-2016 Ben James
 category:            Development
 build-type:          Simple
 -- extra-source-files:  
@@ -26,11 +26,11 @@ executable trawl
   main-is:             Main.hs
   other-modules:       Process
   -- other-extensions:    
-  build-depends:       base >=4.7 && <4.9
+  build-depends:       base >=4.9
                      , Cabal >=1.22
                      , directory
                      , filepath
-                     , process
+                     , process ==1.4.*
                      , optparse-applicative ==0.12.*
                      , regex-compat
                      , split

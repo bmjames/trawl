@@ -28,4 +28,9 @@ mkProcess workingDir cmd args =
                 , close_fds = False
                 , create_group = False
                 , delegate_ctlc = False
+                , detach_console = False
+                , create_new_console = False
+                , new_session = False
+                , child_group = Nothing
+                , child_user = Nothing
                 }
