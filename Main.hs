@@ -17,20 +17,32 @@ import Text.Regex (mkRegex, subRegex)
 newtype PackageName = PackageName String
 newtype ModuleName = ModuleName String
 
-data TrawlOpts = FindPackage PackageName | FindModule ModuleName
+data TrawlOpts = TrawlOpts
+  { optsCmd :: TrawlCmd
+  , optsEnv :: TrawlEnv
+  }
+
+data TrawlCmd = FindPackage PackageName | FindModule ModuleName
+
+data TrawlEnv = TrawlEnv { envStack :: Bool }
 
 trawlOpts :: Parser TrawlOpts
 trawlOpts =
-  FindPackage . PackageName <$>
-    strOption (long "package" <>
-               short 'p' <>
-               metavar "PACKAGE" <>
-               help "Find the haddock index for PACKAGE") <|>
-  FindModule . ModuleName <$>
-    strOption (long "module" <>
-               short 'm' <>
-               metavar "MODULE" <>
-               help "Find the haddock page for MODULE")
+  let pCmd =
+        FindPackage . PackageName <$>
+          strOption (long "package" <>
+                     short 'p' <>
+                     metavar "PACKAGE" <>
+                     help "Find the haddock index for PACKAGE") <|>
+        FindModule . ModuleName <$>
+          strOption (long "module" <>
+                     short 'm' <>
+                     metavar "MODULE" <>
+                     help "Find the haddock page for MODULE")
+      pEnv =
+        TrawlEnv <$> switch (long "stack" <> help "Use stack environment")
+
+  in TrawlOpts <$> pCmd <*> pEnv
 
 main :: IO ()
 main = execParser opts >>= trawl >>= uncurry printExistingFileOrDie
@@ -38,15 +50,15 @@ main = execParser opts >>= trawl >>= uncurry printExistingFileOrDie
     opts = info (helper <*> trawlOpts) fullDesc
 
 trawl :: TrawlOpts -> IO (PackageName, FilePath)
-trawl (FindPackage pkg) = (,) pkg <$> packageHaddockIndex pkg
-trawl (FindModule mod) = moduleHaddock mod
+trawl (TrawlOpts (FindPackage pkg) env) = (,) pkg <$> packageHaddockIndex env pkg
+trawl (TrawlOpts (FindModule mod)  env) = moduleHaddock env mod
 
-packageHaddockIndex :: PackageName -> IO FilePath
-packageHaddockIndex pkg = (</> "index.html") <$> packageHaddock pkg
+packageHaddockIndex :: TrawlEnv -> PackageName -> IO FilePath
+packageHaddockIndex env pkg = (</> "index.html") <$> packageHaddock env pkg
 
-packageHaddock :: PackageName -> IO FilePath
-packageHaddock (PackageName pkg) = do
-  out <- ghcPkg ["describe", pkg]
+packageHaddock :: TrawlEnv -> PackageName -> IO FilePath
+packageHaddock env (PackageName pkg) = do
+  out <- ghcPkg env ["describe", pkg]
   let errMsg = "Output of `ghc-pkg describe " ++ pkg ++ "` contained no haddock paths"
   case parseInstalledPackageInfo out of
     ParseFailed err -> die $ "Failed to parse package info: " ++ show err
@@ -56,26 +68,34 @@ packageHaddock (PackageName pkg) = do
 
   where realHaddockPath = flip $ foldl (subRegex (mkRegex "\\$topdir"))
 
-moduleHaddock :: ModuleName -> IO (PackageName, FilePath)
-moduleHaddock (ModuleName mod) = do
-  out <- ghcPkg ["find-module", mod]
+moduleHaddock :: TrawlEnv -> ModuleName -> IO (PackageName, FilePath)
+moduleHaddock env (ModuleName mod) = do
+  out <- ghcPkg env ["find-module", mod]
   let errMsg = "Output of `ghc-pkg find-module " ++ mod ++ "` contained no packages"
   case reverse (words out) of
     h:_ -> do
       let moduleFile = intercalate "-" (splitOn "." mod) `addExtension` "html"
           pkg = PackageName h
-      haddockRoot <- packageHaddock pkg
+      haddockRoot <- packageHaddock env pkg
       return (pkg, haddockRoot </> moduleFile)
     _ -> die errMsg
 
-ghcPkg :: [String] -> IO String
-ghcPkg args = do
-  ProcessResult exitCode out err <- processResult "." "ghc-pkg" $ ["-v0", "--simple-output"] ++ args
-  case exitCode of
-    ExitSuccess   -> return out
-    ExitFailure c -> do
-      hPutStrLn stderr err
-      die $ "ghc-pkg exited with code " ++ show c
+ghcPkgCmd :: TrawlEnv -> [String] -> (String, [String])
+ghcPkgCmd (TrawlEnv stack) args =
+  let (cmd : cmdOpts) =
+        (if stack then ["stack", "exec", "--"] else []) ++
+        ["ghc-pkg", "-v0", "--simple-output"]
+  in (cmd, cmdOpts ++ args)
+
+ghcPkg :: TrawlEnv -> [String] -> IO String
+ghcPkg env args =
+  let (cmd, cmdArgs) = ghcPkgCmd env args
+  in do ProcessResult exitCode out err <- processResult "." cmd cmdArgs
+        case exitCode of
+          ExitSuccess   -> return out
+          ExitFailure c -> do
+            hPutStrLn stderr err
+            die $ cmd ++ " exited with code " ++ show c
 
 die :: String -> IO a
 die msg = hPutStrLn stderr msg >> exitFailure
