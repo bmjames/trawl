@@ -104,7 +104,7 @@ printExistingFileOrDie :: PackageName -> FilePath -> IO ()
 printExistingFileOrDie (PackageName pkg) file = do
   exists <- doesFileExist file
   if exists
-     then canonicalizePath file >>= putStrLn
+     then canonicalizePath file >>= putStr
      else do
        hPutStrLn stderr $ "File does not exist: " ++ file
        die suggestion
