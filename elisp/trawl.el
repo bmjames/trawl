@@ -5,6 +5,11 @@
   (let ((module (read-from-minibuffer "Module: ")))
     (trawl-browse-output "--stack" "-m" module)))
 
+(defun trawl-browse-member () (interactive)
+  "Browse haddock for member of module in w3m"
+  (let* ((member (read-from-minibuffer "Member: ")))
+    (trawl-browse-output "--stack" "-v" member)))
+
 (defun trawl-browse-package () (interactive)
   "Browse package haddock in w3m"
    (let ((package (read-from-minibuffer "Package: ")))

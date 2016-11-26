@@ -3,11 +3,13 @@ module Main where
 import Process
 
 import Prelude hiding (foldr)
+import Control.Monad.Trans.Reader (ReaderT(..))
 import Data.Foldable (foldr)
 import Data.List (intercalate)
 import Data.List.Split (splitOn)
 import Distribution.InstalledPackageInfo
 import Options.Applicative
+import Options.Applicative.Types (ReadM(..), ParseError(..))
 import System.Directory (canonicalizePath, doesFileExist)
 import System.Exit hiding (die)
 import System.FilePath ((</>), addExtension)
@@ -22,7 +24,10 @@ data TrawlOpts = TrawlOpts
   , optsEnv :: TrawlEnv
   }
 
-data TrawlCmd = FindPackage PackageName | FindModule ModuleName
+data TrawlCmd
+  = FindPackage PackageName
+  | FindModule ModuleName
+  | FindMember ModuleName String
 
 data TrawlEnv = TrawlEnv { envStack :: Bool }
 
@@ -38,20 +43,38 @@ trawlOpts =
           strOption (long "module" <>
                      short 'm' <>
                      metavar "MODULE" <>
-                     help "Find the haddock page for MODULE")
-      pEnv =
-        TrawlEnv <$> switch (long "stack" <> help "Use stack environment")
+                     help "Find the haddock page for MODULE") <|>
+        uncurry FindMember <$>
+          option readModuleMember (long "member" <>
+                                   short 'v' <>
+                                   metavar "MODULE.MEMBER" <>
+                                   help "Find the haddock page section for MEMBER of MODULE")
+
+      pEnv = TrawlEnv <$> switch (long "stack" <> help "Use stack environment")
+
+      readModuleMember :: ReadM (ModuleName, String)
+      readModuleMember = ReadM . ReaderT $ \s ->
+        case splitOn "." s of [x] -> fail "Expected format MODULE.MEMBER"
+                              xs  -> return (ModuleName $ intercalate "." (init xs), last xs)
 
   in TrawlOpts <$> pCmd <*> pEnv
 
 main :: IO ()
-main = execParser opts >>= trawl >>= uncurry printExistingFileOrDie
+main = execParser opts >>= trawl
   where
     opts = info (helper <*> trawlOpts) fullDesc
 
-trawl :: TrawlOpts -> IO (PackageName, FilePath)
-trawl (TrawlOpts (FindPackage pkg) env) = (,) pkg <$> packageHaddockIndex env pkg
-trawl (TrawlOpts (FindModule mod)  env) = moduleHaddock env mod
+trawl :: TrawlOpts -> IO ()
+trawl (TrawlOpts (FindPackage pkg) env) =
+  packageHaddockIndex env pkg >>= canonicalExistingFile pkg >>= putStr
+trawl (TrawlOpts (FindModule mod) env) =
+  moduleHaddock env mod >>= uncurry canonicalExistingFile >>= putStr
+trawl (TrawlOpts (FindMember mod mem) env) = do
+  canonicalPath <- moduleHaddock env mod >>= uncurry canonicalExistingFile
+  putStr $ appendFragment mem canonicalPath
+
+appendFragment :: String -> FilePath -> String
+appendFragment f p = "file://" ++ p ++ "#v:" ++ f
 
 packageHaddockIndex :: TrawlEnv -> PackageName -> IO FilePath
 packageHaddockIndex env pkg = (</> "index.html") <$> packageHaddock env pkg
@@ -100,15 +123,14 @@ ghcPkg env args =
 die :: String -> IO a
 die msg = hPutStrLn stderr msg >> exitFailure
 
-printExistingFileOrDie :: PackageName -> FilePath -> IO ()
-printExistingFileOrDie (PackageName pkg) file = do
-  exists <- doesFileExist file
-  if exists
-     then canonicalizePath file >>= putStr
-     else do
-       hPutStrLn stderr $ "File does not exist: " ++ file
-       die suggestion
+canonicalExistingFile :: PackageName -> FilePath -> IO FilePath
+canonicalExistingFile (PackageName pkg) file =
+  let hint = "Try reinstalling the package " ++ pkg ++ " with --enable-documentation (cabal) or --haddock (stack)"
+  in do
+    exists <- doesFileExist file
+    if exists
+       then canonicalizePath file
+       else do
+         hPutStrLn stderr $ "File does not exist: " ++ file
+         die hint
 
-  where
-    suggestion = "Try reinstalling the package " ++ pkg ++
-        " with --enable-documentation (cabal) or --haddock (stack)"
