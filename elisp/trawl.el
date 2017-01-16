@@ -16,10 +16,10 @@
      (trawl-browse-output "--stack" "-p" package)))
 
 (defun trawl-browse-output (&rest args)
-  "Invoke trawl with ARGS and browse output path in w3m"
+  "Invoke trawl with ARGS and browse output path"
   (with-temp-buffer
     (let ((exit (apply 'call-process "trawl" nil (current-buffer) nil args))
 	  (output (buffer-string)))
       (if (> exit 0)
 	  (message (concat "trawl process failed: " output))
-	  (w3m-browse-url output)))))
+	  (browse-url output)))))
