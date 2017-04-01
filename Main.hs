@@ -4,9 +4,11 @@ import Process
 
 import Prelude hiding (foldr)
 import Control.Monad.Trans.Reader (ReaderT(..))
+import Data.Char
 import Data.Foldable (foldr)
 import Data.List (intercalate)
 import Data.List.Split (splitOn)
+import Data.Monoid
 import Distribution.InstalledPackageInfo
 import Options.Applicative
 import Options.Applicative.Types (ReadM(..), ParseError(..))
@@ -74,7 +76,7 @@ trawl (TrawlOpts (FindMember mod mem) env) = do
   putStr $ appendFragment mem canonicalPath
 
 appendFragment :: String -> FilePath -> String
-appendFragment f p = "file://" ++ p ++ "#v:" ++ f
+appendFragment f p = "file://" ++ p ++ "#v:" ++ makeAnchorId f
 
 packageHaddockIndex :: TrawlEnv -> PackageName -> IO FilePath
 packageHaddockIndex env pkg = (</> "index.html") <$> packageHaddock env pkg
@@ -134,3 +136,13 @@ canonicalExistingFile (PackageName pkg) file =
          hPutStrLn stderr $ "File does not exist: " ++ file
          die hint
 
+makeAnchorId :: String -> String
+makeAnchorId [] = []
+makeAnchorId (x:xs) = escape isAlpha x ++ concatMap (escape isLegal) xs
+  where
+    escape p c | p c = [c]
+               | otherwise = '-' : show (ord c) ++ "-"
+    isLegal ':' = True
+    isLegal '_' = True
+    isLegal '.' = True
+    isLegal c = isAscii c && isAlphaNum c
